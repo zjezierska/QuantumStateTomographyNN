@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import qutip as qt
-import tensorflow
+import tensorflow as tf
 from tensorflow import keras
 from parameters import *
 
@@ -44,25 +44,27 @@ def make_data(size, h, small_d, big_d, op, t_list):  # TODO: very unoptimised(?)
     return inputs, targets
 
 
-def custom_loss(y_true, y_pred):
-    global dimp
-    sums = 0
-    for i in range(batchsize):
-        y_t = give_back_matrix(y_true[i].numpy(), dimp)
-        y_p = give_back_matrix(y_pred[i].numpy(), dimp)
-        if y_t.isherm:
-            if y_p.dag() * y_p == 0:
-                print(y_p)
-                exit()
-            y_pp = (y_p.dag() * y_p) / (y_p.dag() * y_p).tr()
-            y_pp_mat = y_pp.full()
-            y_pp_vec = np.concatenate((y_pp_mat.real.flatten(), y_pp_mat.imag.flatten()))
-            for j in range(2 * dimp ** 2):
-                sums += (y_true[i][j] - y_pp_vec[j]) ** 2
-        else:
-            print(y_t)
-            exit()
-    return sums / batchsize
+# def custom_loss(y_true, y_pred):
+#     global dimp
+#     input_shape = tf.shape(y_pred)
+#     print(input_shape)
+#     sums = 0
+#     for i in range(batchsize):
+#         y_t = give_back_matrix(y_true[i].numpy(), dimp)
+#         y_p = give_back_matrix(y_pred[i].numpy(), dimp)
+#         if y_t.isherm:
+#             if y_p.dag() * y_p == 0:
+#                 print(y_p)
+#                 exit()
+#             y_pp = (y_p.dag() * y_p) / (y_p.dag() * y_p).tr()
+#             y_pp_mat = y_pp.full()
+#             y_pp_vec = np.concatenate((y_pp_mat.real.flatten(), y_pp_mat.imag.flatten()))
+#             for j in range(2 * dimp ** 2):
+#                 sums += (y_true[i][j] - y_pp_vec[j]) ** 2
+#         else:
+#             print(y_t)
+#             exit()
+#     return sums / batchsize
 
 
 def init_net(dimm, tlis):
@@ -73,7 +75,7 @@ def init_net(dimm, tlis):
     net.add(keras.layers.Dense(400, activation='sigmoid'))
     net.add(keras.layers.Dense(200, activation='sigmoid'))
     net.add(keras.layers.Dense(2 * dimm ** 2, activation='tanh'))
-    net.compile(loss=custom_loss, optimizer='adam', run_eagerly=True)
+    net.compile(loss='mse', optimizer='adam', run_eagerly=True)  # todo: use custom_loss
 
 
 def train_net(dim, tlistt, ham):
@@ -127,7 +129,7 @@ def get_infidelities(dim, num_of_points, h):
         tlis = tlist[:t]
         init_net(dim, tlis)
         valid_set, valid_states = train_net(dim, tlis, h)
-        model = tensorflow.keras.models.load_model('best_model.h5')
+        model = tf.keras.models.load_model('best_model.h5')
         validation_predict = model.predict_on_batch(valid_set)
         infidel = 0
         for i in range(n):
