@@ -11,9 +11,8 @@ n = 10000  # idk
 batchsize = 512
 epochz = 10000
 patienc = 500
-d_array = [2]
-np.random.seed(3829834)
-num_of_points = 3
+d_array = [2, 3, 4]
+num_of_points = 10
 # </editor-fold>
 
 # <editor-fold desc="QUANTUM DEFINITIONS">

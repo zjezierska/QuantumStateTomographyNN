@@ -1,33 +1,31 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import qutip as qt
 import tensorflow as tf
 from tensorflow import keras
 from parameters import *
 
-
 if tf.config.list_physical_devices('GPU'):
-  print("TensorFlow **IS** using the GPU")
+    print("TensorFlow **IS** using the GPU")
 else:
-  print("TensorFlow **IS NOT** using the GPU")
+    print("TensorFlow **IS NOT** using the GPU")
 
 
 def custom_loss(y_true, y_pred):
     input_shape = tf.shape(y_pred)
 
-    trace = tf.reduce_sum(tf.square(y_pred), axis = -1)  # trace shape [batchsize, 1]
+    trace = tf.reduce_sum(tf.square(y_pred), axis=-1)  # trace shape [batchsize, 1]
 
-    trace = tf.tile(tf.reshape(trace,[input_shape[0], 1, 1]),multiples=[1,dimp,dimp])
-    matrix_form = tf.reshape(y_pred,(input_shape[0],2,dimp,dimp))
-    matrix_com = tf.complex(matrix_form[:,0,:,:], matrix_form[:,1,:,:])
-    transpose_matrix = tf.transpose(matrix_com, perm=[0,2,1], conjugate=True)
+    trace = tf.tile(tf.reshape(trace, [input_shape[0], 1, 1]), multiples=[1, dimp, dimp])
+    matrix_form = tf.reshape(y_pred, (input_shape[0], 2, dimp, dimp))
+    matrix_com = tf.complex(matrix_form[:, 0, :, :], matrix_form[:, 1, :, :])
+    transpose_matrix = tf.transpose(matrix_com, perm=[0, 2, 1], conjugate=True)
     result = tf.keras.backend.batch_dot(transpose_matrix, matrix_com)
     final_stuff = tf.divide(result, tf.cast(trace, tf.complex64))
 
-    finalfinal_stuff = tf.concat([tf.reshape(tf.math.real(final_stuff), (input_shape[0], -1)), tf.reshape(tf.math.imag(final_stuff), (input_shape[0], -1))], axis=-1)
+    finalfinal_stuff = tf.concat([tf.reshape(tf.math.real(final_stuff), (input_shape[0], -1)),
+                                  tf.reshape(tf.math.imag(final_stuff), (input_shape[0], -1))], axis=-1)
 
     return tf.math.reduce_mean(tf.square(finalfinal_stuff - y_true), axis=-1)
-    
+
 
 def init_net(dimm, tlis):
     global net, batchsize
@@ -85,7 +83,7 @@ def get_infidelities(dim, num_of_points, h):
     dimp = dim
     target = np.load(f'data/{dim}d/states/normal.npy')
     valid_states = np.load(f"data/{dim}d/states/valid.npy")
-    
+
     x_traj = [[] for m in range(n)]
     var_traj = [[] for m in range(n)]
     x_traj_valid = [[] for m in range(n)]
@@ -96,7 +94,7 @@ def get_infidelities(dim, num_of_points, h):
 
         x_traj_valid[i] = np.load(f"data/{dim}d/trajectories/H_quartic/validation/x{i}.npy")
         var_traj_valid[i] = np.load(f"data/{dim}d/trajectories/H_quartic/validation/variance{i}.npy")
-    
+
     x_traj = np.array(x_traj)
     var_traj = np.array(var_traj)
     x_traj_valid = np.array(x_traj_valid)
@@ -106,8 +104,8 @@ def get_infidelities(dim, num_of_points, h):
         if t == 0:
             continue
 
-        point_traj = np.concatenate((x_traj[:, :t], var_traj[:, :t]), axis = 1)
-        point_traj_valid = np.concatenate((x_traj_valid[:,:t], var_traj_valid[:,:t]), axis = 1)
+        point_traj = np.concatenate((x_traj[:, :t], var_traj[:, :t]), axis=1)
+        point_traj_valid = np.concatenate((x_traj_valid[:, :t], var_traj_valid[:, :t]), axis=1)
 
         init_net(dim, tlist[:t])
 
@@ -118,7 +116,7 @@ def get_infidelities(dim, num_of_points, h):
         for i in range(n):
             val_true = give_back_matrix(valid_states[i, :], dim)
             val_predict1 = give_back_matrix(validation_predict[i, :], dim)
-            val_predict = (val_predict1.dag()*val_predict1) / (val_predict1.dag()*val_predict1).tr()
+            val_predict = (val_predict1.dag() * val_predict1) / (val_predict1.dag() * val_predict1).tr()
             infidel += 1 - qt.fidelity(val_predict, val_true)
 
         infidelities.append(infidel / n)
