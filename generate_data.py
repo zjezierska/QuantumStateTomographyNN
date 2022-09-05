@@ -29,23 +29,28 @@ def make_data(size, h, small_d, big_d, op, t_list, valid=False):
             elif h == H_harmonic:
                 np.save(f"data/{small_d}d/trajectories/H_harmonic/validation/x{i}.npy", first_trajectory)
                 np.save(f"data/{small_d}d/trajectories/H_harmonic/validation/variance{i}.npy", second_trajectory)
+            print(f"Saving {small_d}d validation {i}")
         elif h == H_quartic:
             np.save(f"data/{small_d}d/trajectories/H_quartic/normal/x{i}.npy", first_trajectory)
             np.save(f"data/{small_d}d/trajectories/H_quartic/normal/variance{i}.npy", second_trajectory)
+            print(f"Saving {small_d}d normal {i}")
         elif h == H_harmonic:
             np.save(f"data/{small_d}d/trajectories/H_harmonic/normal/x{i}.npy", first_trajectory)
             np.save(f"data/{small_d}d/trajectories/H_harmonic/normal/variance{i}.npy", second_trajectory)
+            print(f"Saving {small_d}d normal {i}")
     
     targets = np.array(target1s)
     if valid:
         np.save(f'data/{small_d}d/states/valid.npy', targets)
+        print(f"Saving {small_d}d states valid")
     else:
         np.save(f'data/{small_d}d/states/normal.npy', targets)
+        print(f"Saving {small_d}d states normal")
 
 
 make_data(n, H_quartic, 2, D, x, tlist)
 make_data(n, H_quartic, 2, D, x, tlist, valid=True)
 make_data(n, H_quartic, 3, D, x, tlist)
 make_data(n, H_quartic, 3, D, x, tlist, valid=True)
-#make_data(n, H_quartic, 4, D, x, tlist)
-#make_data(n, H_quartic, 4, D, x, tlist, valid=True)
+make_data(n, H_quartic, 4, D, x, tlist)
+make_data(n, H_quartic, 4, D, x, tlist, valid=True)
