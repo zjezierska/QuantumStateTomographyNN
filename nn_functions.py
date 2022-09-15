@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
-from parameters import *
+from parameters_talitha import *
 
 if tf.config.list_physical_devices('GPU'):
     print("TensorFlow **IS** using the GPU")
@@ -9,7 +9,7 @@ else:
     print("TensorFlow **IS NOT** using the GPU")
 
 
-def custom_loss(y_true, y_pred):
+def custom_loss(y_true, y_pred):  # my custom loss function - maybe faster than talitha's because of tf
     input_shape = tf.shape(y_pred)
 
     trace = tf.reduce_sum(tf.square(y_pred), axis=-1)  # trace shape [batchsize, 1]
@@ -27,7 +27,7 @@ def custom_loss(y_true, y_pred):
     return tf.math.reduce_mean(tf.square(finalfinal_stuff - y_true), axis=-1)
 
 
-def init_net(dimm, tlis):
+def init_net(dimm, tlis):  # creating and compiling the network
     global net, batchsize
     net = keras.models.Sequential()
     net.add(keras.layers.Dense(800, input_shape=(2 * len(tlis),), activation='sigmoid'))
@@ -35,14 +35,14 @@ def init_net(dimm, tlis):
     net.add(keras.layers.Dense(400, activation='sigmoid'))
     net.add(keras.layers.Dense(200, activation='sigmoid'))
     net.add(keras.layers.Dense(2 * dimm ** 2, activation='tanh'))
-    net.compile(loss=custom_loss, optimizer='adam')  # todo: use custom_loss
+    net.compile(loss=custom_loss, optimizer='adam')
 
 
-def train_net(y_in, y_out, valid_x, valid_y):
+def train_net(y_in, y_out, valid_x, valid_y):  # training the network with some callbacks
     global epochz, patienc, n, batchsize
-    callbackz = [keras.callbacks.EarlyStopping(monitor='val_loss', patience=patienc, verbose=1),
-                 keras.callbacks.ModelCheckpoint(filepath='best_model.h5', monitor='val_loss',
-                                                 save_best_only=True)]  # early stopping and saving the best
+    callbackz = [keras.callbacks.EarlyStopping(monitor='val_loss', patience=patienc, verbose=1, mode='min'),
+                 keras.callbacks.ModelCheckpoint(filepath=f'Models/best_model{y_in.shape}.h5', monitor='val_loss',
+                                                 save_best_only=True, mode='min')]  # early stopping and saving the best
     # model, to use in validation set
 
     history = net.fit(y_in, y_out, batch_size=batchsize, epochs=epochz, validation_data=(valid_x, valid_y),
@@ -57,68 +57,60 @@ def give_back_matrix(vectr, dimen):  # turn the 2d**2 vector back into Qobj matr
     return qt.Qobj(matrix)
 
 
-def draw_wigner(true_drawing, predicted_drawing):
-    xvec = np.linspace(-5, 5, 200)
-    W1 = qt.wigner(true_drawing, xvec, xvec)
-    W2 = qt.wigner(predicted_drawing, xvec, xvec)
-
-    wmap = qt.wigner_cmap(W1)  # can edit colormap, put it in cmap
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-    ax1.contourf(xvec, xvec, W1, 100, cmap='RdBu_r')
-    ax1.set_title("True state")
-    ax2.contourf(xvec, xvec, W2, 100, cmap='RdBu_r')
-    ax2.set_title("Predicted state")
-    fig.suptitle('True vs predicted Wigner function')
-
-    plt.show()
+def my_fidelity(vec1, vec2, d):  # normalizing vec2 and calculating fidelity between two states in vector form
+    vec1 = give_back_matrix(vec1, d)
+    vec2 = give_back_matrix(vec2, d)
+    if vec1.isherm:
+        vec2 = (vec2.dag() * vec2) / (vec2.dag() * vec2).tr()
+        return qt.fidelity(vec1, vec2)
+    else:
+        raise ValueError('X is not Hermitian!')
 
 
-dimp = 0
+dimp = 0  # the global dimp parameter needs to be used in the custom loss function - maybe in can be implemented more
+# nicely
 
 
-def get_infidelities(dim, num_of_points, h):
+def get_infidelities(dim, num_of_pointz, h):
     global dimp
-    infidelities = []
+    avg_infidelities = []
     print(f"---------------BEGINNING DIMENSION {dim}---------------")
     dimp = dim
-    target = np.load(f'data/{dim}d/states/normal.npy')
-    valid_states = np.load(f"data/{dim}d/states/valid.npy")
 
-    x_traj = [[] for m in range(n)]
-    var_traj = [[] for m in range(n)]
-    x_traj_valid = [[] for m in range(n)]
-    var_traj_valid = [[] for m in range(n)]
-    for i in range(n):
-        x_traj[i] = np.load(f"data/{dim}d/trajectories/H_quartic/normal/x{i}.npy")
-        var_traj[i] = np.load(f"data/{dim}d/trajectories/H_quartic/normal/variance{i}.npy")
+    x_traj = [np.load(f"data/{dim}d/trajectories/H_quartic/x{i}.npy") for i in range(2 * n)]
+    var_traj = [np.load(f"data/{dim}d/trajectories/H_quartic/variance{i}.npy") for i in range(2 * n)]  # load the trajectories
 
-        x_traj_valid[i] = np.load(f"data/{dim}d/trajectories/H_quartic/validation/x{i}.npy")
-        var_traj_valid[i] = np.load(f"data/{dim}d/trajectories/H_quartic/validation/variance{i}.npy")
+    x_traj_valid = x_traj[n:]
+    var_traj_valid = var_traj[n:]
+    x_traj = x_traj[:n]
+    var_traj = var_traj[:n]
 
     x_traj = np.array(x_traj)
     var_traj = np.array(var_traj)
+
     x_traj_valid = np.array(x_traj_valid)
-    var_traj_valid = np.array(var_traj_valid)
+    var_traj_valid = np.array(var_traj_valid)  # cutting the data into training and validation parts
 
-    for t in range(0, N, N // num_of_points):
-        if t == 0:
-            continue
+    y_out = np.load(f'data/{dim}d/states.npy')  # load the states
+    y_valid_out = y_out[n:, :]
+    y_out = y_out[:n, :]
+    dt = N // num_of_pointz
 
-        point_traj = np.concatenate((x_traj[:, :t], var_traj[:, :t]), axis=1)
-        point_traj_valid = np.concatenate((x_traj_valid[:, :t], var_traj_valid[:, :t]), axis=1)
+    for t in range(0, N, dt):  # code for each of the points
+        print(f"BEGINNING {t} - DIM {dim}")
 
-        init_net(dim, tlist[:t])
+        point_traj = np.concatenate((x_traj[:, :t+dt], var_traj[:, :t+dt]), axis=1)
+        point_traj_valid = np.concatenate((x_traj_valid[:, :t+dt], var_traj_valid[:, :t+dt]), axis=1)  # shortened
+        # trajectories
 
-        train_net(point_traj, target, point_traj_valid, valid_states)
-        model = tf.keras.models.load_model('best_model.h5', custom_objects={'custom_loss': custom_loss})
-        validation_predict = model.predict_on_batch(point_traj_valid)
-        infidel = 0
-        for i in range(n):
-            val_true = give_back_matrix(valid_states[i, :], dim)
-            val_predict1 = give_back_matrix(validation_predict[i, :], dim)
-            val_predict = (val_predict1.dag() * val_predict1) / (val_predict1.dag() * val_predict1).tr()
-            infidel += 1 - qt.fidelity(val_predict, val_true)
+        init_net(dim, tlist[:t+dt])
+        train_net(point_traj, y_out, point_traj_valid, y_valid_out)  # initiating and training the network
 
-        infidelities.append(infidel / n)
+        model1 = tf.keras.models.load_model(f'Models/best_model{point_traj.shape}.h5',
+                                            custom_objects={'custom_loss': custom_loss})  # loading the best model
 
-    return infidelities
+        validation_predict = model1.predict_on_batch(point_traj_valid)
+        fidelities = [my_fidelity(y_valid_out[i, :], validation_predict[i, :], dim) for i in range(n)]
+        avg_infidelities.append(1 - np.average(fidelities))  # average infidelity on valid_data for the point
+
+    return avg_infidelities

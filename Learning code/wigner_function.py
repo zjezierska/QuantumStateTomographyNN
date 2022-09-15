@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib import cm, colors
 import matplotlib
-from mpl_toolkits.axes_grid1 import AxesGrid
+import tensorflow as tf
 
 
 def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
@@ -59,9 +59,8 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
     return newcmap
 
 
-d = 4
-D = 20
-w = 1.0
+d = 5
+D = 40
 alpha = 5
 rho0 = rand_dm_hs(N=d)  # initial state
 rho1 = coherent_dm(N=d, alpha=1.0)
@@ -71,37 +70,66 @@ full_array[0:d, 0:d] = rho0.full()
 full_state = Qobj(full_array)
 
 xvec = np.linspace(-5, 5, 200)
-a = destroy(d)  # oscillator annihilation operator
-x = (a.dag() + a) / np.sqrt(2 * w)
-p = 1j * (a.dag() - a) * np.sqrt(w / 2)
-W_coherent = wigner(rho0, xvec, xvec)
-H1 = w * (a.dag() * a + 1 / 2)
-h = (- (w * (a.dag() - a)) ** 2) / 8 + (((a.dag() + a) / alpha) ** 4) / (4 * w)
+a = destroy(d)  # annihilation operator
+x = a.dag() + a
+p = 1j * (a.dag() - a)
+H_quartic = p * p / 4 + (x / alpha) * (x / alpha) * (x / alpha) * (x / alpha)
+H_harmonic = a.dag() * a
 
-wmap = wigner_cmap(W_coherent)
+Wigner = wigner(rho0, xvec, xvec)
 
-fig, ax = plt.subplots(1, 1)
-plot1 = ax.contourf(xvec, xvec, W_coherent, 100, cmap=wmap)
-fig.colorbar(plot1, ax=ax)
-ax.set_title("Random state in quartic potential")
+fig, axs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2.5, 1]})
+plot1 = axs[0].contourf(xvec, xvec, Wigner, 100, cmap='RdBu_r')
+pd = HarmonicOscillatorProbabilityFunction()  # create probabiliy distribution object
+pd.update(rho0)  # function to return P(x) from rho - returns P as pd.data and x as pd.xvecs[0]
+axs[1].plot(pd.xvecs[0], np.real(pd.data), '-')
 
-tlist = np.linspace(0, 100, 1000)
+frames = 300
+tlist = np.linspace(0, 15, frames)
+#
+# for i in range(3):
+#     W = wigner(result.states[i], xvec, xvec)
+#     axs[0, i].contourf(xvec, xvec, W, 100, cmap='RdBu_r')
+#     pd.update(result.states[i])
+#     axs[1, i].plot(pd.xvecs[0], np.real(pd.data), '-')
+#     axs[0, 0].set_xticklabels([])
+#     if i != 0:
+#         axs[0, i].set_xticklabels([])
+#         axs[0, i].set_yticklabels([])
+#         axs[1, i].set_yticklabels([])
+#
+# axs[1, 0].set_xlabel(r'$x$')
+# axs[1, 0].set_ylabel(r'$P(x)$')
+#
+# plt.subplots_adjust(wspace=1)
+
 
 # request that the solver return the expectation value of the photon number state operator
-result = mesolve(h, rho0, tlist, [], [])
+result = mesolve(H_harmonic, rho0, tlist, [], [])
+# for i in range(9):
+#     W = wigner(result.states[i], xvec, xvec)
+#     axs[0].contourf(xvec, xvec, W, 100, cmap='RdBu_r')
+#     pd.update(result.states[i])
+#     axs[1].plot(pd.xvecs[0], np.real(pd.data), '-')
 
 
 def animate_plot(i):
     plt.cla()
     W = wigner(result.states[i], xvec, xvec)
-    ax.contourf(xvec, xvec, W, 100, cmap=wmap)
-    ax.set_title("Random state in quartic potential")
+    axs[0].contourf(xvec, xvec, W, 100, cmap='RdBu_r')
+    pd.update(result.states[i])
+    axs[1].plot(pd.xvecs[0], np.real(pd.data), '-')
+    axs[1].set_ylim([0, 0.5])
+    # axs[0].set_aspect('equal', adjustable='box')
+    # axs[1].set_aspect('auto', adjustable='box')
+    axs[1].set_ylabel(r"$P(x)$")
+    axs[1].set_xlabel(r"$x$")
 
 
-ani = FuncAnimation(fig, animate_plot, frames=1000, interval=50)
+ani = FuncAnimation(fig, animate_plot, frames=frames, interval=200)
 
-# Save as gif
+# # Save as gif
 
-# ani.save('animation.gif', fps=10)
-
+ani.save('animation2.5.gif', fps=10)
+#fig.savefig('myimage.svg', format='svg', dpi=1200)
 plt.show()

@@ -13,15 +13,16 @@ gamma = 0  # decoherence rate
 batchsize = 512
 epochz = 10000
 patienc = 500
+np.random.seed(3829834)
 # </editor-fold>
 
 # <editor-fold desc="QUANTUM DEFINITIONS">
 a = qt.destroy(D)  # annihilation operator
-x = (a.dag() + a) / np.sqrt(2 * w)
-p = 1j * (a.dag() - a) * np.sqrt(w / 2)
-h = (- (w * (a.dag() - a)) ** 2) / 8 + (((a.dag() + a) / alpha) ** 4) / (4 * w)  # quartic potential
+x = a.dag() + a
+p = 1j * (a.dag() - a)
+H_quartic = p*p/4 + (x/alpha)*(x/alpha)*(x/alpha)*(x/alpha)
 c_ops = [np.sqrt(gamma) * x]  # decoherence
-dt = 0.05
+dt = 0.01
 
 
 # </editor-fold>
@@ -32,7 +33,7 @@ def make_batch(size, t_list):
     target1s = [[] for o in range(size)]
     inputs1 = [[] for m in range(size)]
     for i in range(size):
-        t = qt.rand_dm_hs(N=d, seed=3829834)  # generating random state
+        t = qt.rand_dm_hs(N=d)  # generating random state
 
         # turning the state into 2d^2 vector - Talitha way
         full_array = np.full([D, D], 0. + 0.j)
@@ -41,7 +42,7 @@ def make_batch(size, t_list):
         target1s[i] = np.concatenate((t_new.real.flatten(), t_new.imag.flatten()))  # one of expected results
 
         # calculating the moments of the evolution at times in tlist
-        evolution = qt.mesolve(h, beginning_state, t_list, c_ops, [x, x ** 2])
+        evolution = qt.mesolve(H_quartic, beginning_state, t_list, c_ops, [x, x ** 2])
         [j - qt.expect(x, beginning_state) for j in evolution.expect[0]]  # offset from <x(0)>
         first_trajectory = evolution.expect[0].flatten()  # trajectory of <x> - <x(0)>
         second_trajectory = (evolution.expect[1] - evolution.expect[0] ** 2).flatten()  # trajectory of <x^2> - <x>^2
@@ -72,6 +73,8 @@ def give_back_matrix(vectr):  # turn the 2d**2 vector back into Qobj matrix
     return qt.Qobj(matrix)
 
 
+
+
 val_losses = []
 times = []
 x_ax = np.linspace(100, 2100, num=20)
@@ -79,9 +82,9 @@ for iterator in range(100, 2100, 100):
     tlist = np.linspace(0, iterator * dt, iterator)
     inputz, targetz = make_batch(10000, tlist)
     init_net(iterator)
-    callbackz = [tensorflow.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patienc, verbose=1)]
+    callbackz = [tensorflow.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patienc, verbose=1, mode='min')]
     beginning = time.time()
-    history = net.fit(inputz, targetz, batch_size=batchsize, epochs=epochz, validation_split=0.5, callbacks=callbackz)
+    history = net.fit(inputz, targetz, batch_size=batchsize, epochs=epochz, validation_split=0.2, callbacks=callbackz)
     val_losses.append(np.mean(history.history['val_loss']))
     times.append(time.time() - beginning)
 
@@ -96,6 +99,7 @@ ax.plot(x_ax, val_losses, "-o", label='Avg validation loss')
 ax.set_xlabel("Input size", fontsize=14)
 # set y-axis label
 ax.set_ylabel("loss function")
+ax.set_yscale('log')
 
 # twin object for two different y-axis on the sample plot
 ax2 = ax.twinx()
@@ -105,6 +109,6 @@ ax2.set_ylabel("running time [s]")
 fig.legend()
 plt.show()
 # save the plot as a file
-fig.savefig('speed1.svg',
+fig.savefig('speed2.svg',
             dpi=300,
             bbox_inches='tight')

@@ -14,8 +14,6 @@ for t in range(1, N, int(N/num_of_points)):
     for i in range(n):
         val_true = give_back_matrix(valid_states[i, :])
         val_predict = give_back_matrix(validation_predict[i, :])
-        # val_predict = (val_predict.dag() * val_predict) / (val_predict.dag() * val_predict).tr()
-        # todo: put this in custom loss function - true physical state
         infidel += 1 - qt.fidelity(val_predict, val_true)
 
     infidelities.append(np.mean(infidel))
